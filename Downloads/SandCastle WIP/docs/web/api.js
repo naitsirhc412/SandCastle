@@ -17,8 +17,8 @@
 
 'use strict';
 
-const { parseCSV }                    = require('../../src/parser');
-const { calculateMetrics, runWhatIf } = require('../../src/calculations');
+const { parseCSV }                                   = require('../../src/parser');
+const { calculateMetrics, runWhatIf, categorizeCost } = require('../../src/calculations');
 
 // ── IndexedDB helpers ────────────────────────────────────────────────────────
 const DB_NAME    = 'sandcastle';
@@ -225,6 +225,113 @@ async function getPeriodLabels(viewBy) {
   return labels;
 }
 
+// ── Data coverage analysis — mirrors main.js analyzeDataCoverage() ───────────
+
+function analyzeDataCoverage(payload, alignedExpenseRows, monthKeys) {
+  const globalWarnings = [];
+  const monthWarnings  = {};
+
+  const hasPOS      = (payload.posRows     || []).length > 0;
+  const hasPayroll  = (payload.payrollRows || []).length > 0 ||
+                      (payload.fixedInputs && payload.fixedInputs.extra_payroll > 0);
+  const overrides   = payload.categoryOverrides || {};
+
+  const hasMaterial = alignedExpenseRows.some(r =>
+    categorizeCost(r.category, overrides) === 'material'
+  );
+  const hasFixedCSV = alignedExpenseRows.some(r => {
+    const t = categorizeCost(r.category, overrides);
+    if (t === 'fixed') return true;
+    if ((t === 'variable' || t === 'ambiguous') && r._classHint)
+      return categorizeCost(r._classHint, overrides) === 'fixed';
+    return false;
+  });
+  const fixedInputs    = payload.fixedInputs || {};
+  const hasFixedManual = Object.entries(fixedInputs).some(([k, v]) => k !== 'extra_payroll' && (v || 0) > 0);
+  const hasFixed       = hasFixedCSV || hasFixedManual;
+  const hasVariable    = alignedExpenseRows.some(r => {
+    const t = categorizeCost(r.category, overrides);
+    if (t === 'variable' || t === 'ambiguous') {
+      if (r._classHint) return categorizeCost(r._classHint, overrides) === 'variable';
+      return true;
+    }
+    return false;
+  });
+
+  if (!hasPOS)     globalWarnings.push({ code: 'no_pos',      level: 'high',
+    title: 'No revenue / POS data',
+    impact: 'Revenue will be $0. All profit metrics, margins, and ratios will be meaningless.',
+    affects: ['revenue','profit','margin','prime_cost','break_even'] });
+  if (!hasPayroll) globalWarnings.push({ code: 'no_payroll',  level: 'high',
+    title: 'No payroll data',
+    impact: 'Labor cost will be $0. Prime cost and profit will be significantly overstated. Payroll is typically 25–35% of revenue.',
+    affects: ['payroll','prime_cost','profit','margin'] });
+  if (!hasMaterial) globalWarnings.push({ code: 'no_material', level: 'high',
+    title: 'No food / beverage cost data (COGS)',
+    impact: 'Material cost will be $0. Prime cost and profit will be significantly overstated. Food & beverage costs are typically 28–35% of revenue.',
+    affects: ['material','prime_cost','profit','margin'] });
+  if (!hasFixed)   globalWarnings.push({ code: 'no_fixed',    level: 'high',
+    title: 'No fixed expenses (rent, insurance, etc.)',
+    impact: 'Fixed costs will be $0. Profit will be overstated and break-even will be wrong. Fixed costs are typically 15–20% of revenue.',
+    affects: ['fixed','profit','margin','break_even'] });
+  if (!hasVariable) globalWarnings.push({ code: 'no_variable', level: 'medium',
+    title: 'No variable operating expenses',
+    impact: 'Variable costs (delivery fees, utilities, packaging, etc.) will be $0. Profit will be slightly overstated. Typically 2–8% of revenue.',
+    affects: ['variable','profit','margin'] });
+
+  // Per-month gap analysis (multi-period uploads)
+  if (monthKeys.length > 1) {
+    const fmtYM = ym => { const [y,m] = ym.split('-'); return new Date(y,m-1,1).toLocaleString('en-US',{month:'short',year:'numeric'}); };
+    const addMonth = (ym, w) => { (monthWarnings[ym] = monthWarnings[ym] || []).push(w); };
+
+    const posMonths = new Set((payload.posRows || []).filter(r => r.date).map(r => r.date.slice(0,7)));
+    const payMonths = new Set((payload.payrollRows || []).filter(r => r.date).map(r => r.date.slice(0,7)));
+    const matMonths = new Set(alignedExpenseRows.filter(r => {
+      const t = categorizeCost(r.category, overrides);
+      if (t === 'material') return true;
+      if (r._classHint) return categorizeCost(r._classHint, overrides) === 'material';
+      return false;
+    }).filter(r => r.date).map(r => r.date.slice(0,7)));
+
+    if (matMonths.size > 0)
+      [...posMonths].filter(m => !matMonths.has(m)).forEach(ym => addMonth(ym, {
+        code:'gap_material', level:'high', title:`COGS missing for ${fmtYM(ym)}`,
+        impact:`${fmtYM(ym)} has POS revenue but no food/beverage cost data.`,
+        affects:['material','prime_cost','profit','margin'] }));
+
+    if (payMonths.size > 0)
+      [...posMonths].filter(m => !payMonths.has(m)).forEach(ym => addMonth(ym, {
+        code:'gap_payroll', level:'high', title:`Payroll missing for ${fmtYM(ym)}`,
+        impact:`${fmtYM(ym)} has revenue but no payroll data.`,
+        affects:['payroll','prime_cost','profit','margin'] }));
+
+    if (posMonths.size > 0)
+      [...new Set(alignedExpenseRows.filter(r=>r.date).map(r=>r.date.slice(0,7)))]
+        .filter(m => !posMonths.has(m))
+        .forEach(ym => addMonth(ym, {
+          code:'gap_revenue', level:'high', title:`Revenue missing for ${fmtYM(ym)}`,
+          impact:`${fmtYM(ym)} has expense rows but no POS revenue.`,
+          affects:['revenue','profit','margin'] }));
+
+    ['gap_material','gap_payroll','gap_revenue'].forEach(code => {
+      const affected = Object.entries(monthWarnings).filter(([,ws])=>ws.some(w=>w.code===code)).map(([ym])=>fmtYM(ym));
+      if (!affected.length) return;
+      const labels  = { gap_material:'COGS', gap_payroll:'Payroll', gap_revenue:'Revenue' };
+      const impacts = {
+        gap_material: 'Those months will show $0 food cost. Prime cost and profit will be overstated.',
+        gap_payroll:  'Those months will show $0 labor cost, inflating profit and prime cost.',
+        gap_revenue:  'Those months will show $0 revenue with real expenses, appearing as catastrophic losses.',
+      };
+      const aff = { gap_material:['material','prime_cost','profit','margin'], gap_payroll:['payroll','prime_cost','profit','margin'], gap_revenue:['revenue','profit','margin'] };
+      globalWarnings.push({ code, level:'high',
+        title:`${labels[code]} missing for ${affected.length} month${affected.length>1?'s':''}`,
+        detail: affected.join(', '), impact: impacts[code], affects: aff[code] });
+    });
+  }
+
+  return { global: globalWarnings, byMonth: monthWarnings };
+}
+
 // ── savePeriod — mirrors main.js logic (splitting multi-month uploads) ───────
 
 function _calcMetrics(payload) {
@@ -238,6 +345,13 @@ async function savePeriod(payload) {
     ...(payload.expenseRows || []),
   ];
   const monthKeys = [...new Set(allRows.filter(r => r.date).map(r => r.date.slice(0, 7)))].sort();
+
+  // ── Data coverage check — show warning modal before saving ────────────────
+  const alignedExpenseRows = payload.expenseRows || [];
+  const { global: coverageWarnings } = analyzeDataCoverage(payload, alignedExpenseRows, monthKeys);
+  if (coverageWarnings.length > 0 && !payload.confirmed) {
+    return { needsConfirmation: true, warnings: coverageWarnings };
+  }
 
   if (monthKeys.length <= 1) {
     const metrics = _calcMetrics(payload);
