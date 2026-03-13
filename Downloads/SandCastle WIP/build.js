@@ -22,7 +22,7 @@ const prod    = process.argv.includes('--minify');
 const config = {
   entryPoints: ['docs/web/api.js'],
   bundle:      true,
-  outfile:     'docs/web/bundle.js',
+  outfile:     'renderer/bundle.js',
   platform:    'browser',
   format:      'iife',
   sourcemap:   true,
