@@ -340,8 +340,25 @@ nav{flex:1;padding:8px;-webkit-app-region:no-drag;overflow:visible}
 .inp-prefix input{padding-left:26px !important}
 .inp-group input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 8px;border-radius:6px;font-size:14px;font-family:'DM Mono',monospace;outline:none;transition:border-color .12s,background .3s}
 .inp-group input:focus{border-color:var(--accent)}
-.period-row{display:flex;gap:9px;align-items:center;margin-bottom:6px}
+.period-row{display:flex;gap:9px;align-items:flex-end;margin-bottom:6px}
 .period-row .inp-group{flex:1}
+.period-row .inp-group label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.manual-exp-btn{font-size:13px;color:var(--text3);background:transparent;border:1px dashed var(--border2);padding:5px 16px;border-radius:20px;cursor:pointer;transition:all .15s;margin-top:8px;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:6px}
+.manual-exp-btn:hover{color:var(--accent);border-color:var(--accent);background:rgba(184,112,26,.05)}
+.manual-exp-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px;display:none;transition:background .3s}
+.manual-exp-section>h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:600;margin:0 0 6px}
+.manual-exp-section>.me-intro{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6}
+.me-section-head{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--text);margin:14px 0 9px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:7px}
+.me-section-head span{font-weight:400;color:var(--text3);font-size:12px}
+.me-section-head:first-of-type{margin-top:0}
+.custom-exp-row{display:flex;gap:7px;align-items:center;margin-bottom:6px}
+.custom-exp-row input[type=text]{flex:2;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 8px;border-radius:6px;font-size:14px;outline:none;transition:border-color .12s,background .3s;font-family:'DM Sans',sans-serif}
+.custom-exp-row input[type=text]:focus{border-color:var(--accent)}
+.custom-exp-row .inp-prefix{flex:1;min-width:110px}
+.rm-custom-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:15px;padding:3px 6px;border-radius:4px;transition:color .12s;line-height:1;flex-shrink:0}
+.rm-custom-btn:hover{color:var(--red)}
+.add-custom-btn{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--accent);background:none;border:1px solid var(--border2);border-radius:5px;padding:4px 11px;cursor:pointer;margin-top:6px;transition:all .12s;font-family:'DM Sans',sans-serif}
+.add-custom-btn:hover{background:rgba(184,112,26,.07);border-color:var(--accent)}
 .period-hint{font-size:14px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace}
 .hist-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:background .3s}
 .hist-card h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:600;padding:12px 15px;border-bottom:1px solid var(--border)}
@@ -609,6 +626,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
         <div class="dz-drop-hint">CSV · XLSX · XLS · or drop a whole folder</div>
       </div>
       <div class="preview" id="pv-expenses"></div>
+      <div style="text-align:center;margin-top:2px">
+        <button class="manual-exp-btn" id="manual-exp-toggle" onclick="toggleManualExpenses()">📝 Don't have expense reports? Enter manually →</button>
+      </div>
     </div>
     <div class="upload-card">
       <h3>🏦 Bank Statement</h3><div class="uc-sub">Optional — for reconciliation reference</div>
@@ -623,6 +643,48 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
       </div>
       <div class="preview" id="pv-bank"></div>
     </div>
+  </div>
+
+  <!-- ── Manual Expense Entry (shown when user has no expense files) ── -->
+  <div class="manual-exp-section" id="manual-exp-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h3>📝 Manual Expense Entry</h3>
+      <button class="btn" onclick="toggleManualExpenses()" style="font-size:13px;padding:3px 10px;color:var(--text2);background:var(--surface2);border:1px solid var(--border2)">✕ Close</button>
+    </div>
+    <p class="me-intro">No expense file? Enter your monthly costs directly. Keep <strong>fixed</strong> costs (same every month) separate from <strong>variable</strong> costs (change with sales volume) — SandCastle uses the distinction to calculate your break-even accurately.</p>
+
+    <!-- Fixed Expenses -->
+    <div class="me-section-head">📌 Fixed Expenses <span>— same amount every month regardless of sales</span></div>
+    <div class="inp-grid">
+      <div class="inp-group"><label>Rent</label><div class="inp-prefix"><span>$</span><input type="number" id="m-rent" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Insurance</label><div class="inp-prefix"><span>$</span><input type="number" id="m-insurance" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>POS &amp; Software</label><div class="inp-prefix"><span>$</span><input type="number" id="m-pos" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Marketing</label><div class="inp-prefix"><span>$</span><input type="number" id="m-marketing" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Accounting</label><div class="inp-prefix"><span>$</span><input type="number" id="m-accounting" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Licenses &amp; Permits</label><div class="inp-prefix"><span>$</span><input type="number" id="m-licenses" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Equipment Lease</label><div class="inp-prefix"><span>$</span><input type="number" id="m-equiplease" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Other Fixed</label><div class="inp-prefix"><span>$</span><input type="number" id="m-otherfixed" placeholder="0.00" min="0" step="0.01"></div></div>
+    </div>
+
+    <!-- Variable Expenses -->
+    <div class="me-section-head">📈 Variable Expenses <span>— fluctuate with sales &amp; business volume</span></div>
+    <div class="inp-grid">
+      <div class="inp-group"><label>Utilities</label><div class="inp-prefix"><span>$</span><input type="number" id="m-utilities" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Repairs &amp; Maint.</label><div class="inp-prefix"><span>$</span><input type="number" id="m-repairs" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Delivery &amp; Packaging</label><div class="inp-prefix"><span>$</span><input type="number" id="m-delivery" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>CC Processing Fees</label><div class="inp-prefix"><span>$</span><input type="number" id="m-ccfees" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Cleaning Supplies</label><div class="inp-prefix"><span>$</span><input type="number" id="m-cleaning" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Uniforms &amp; Laundry</label><div class="inp-prefix"><span>$</span><input type="number" id="m-uniforms" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Trash &amp; Waste</label><div class="inp-prefix"><span>$</span><input type="number" id="m-trash" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Linen Service</label><div class="inp-prefix"><span>$</span><input type="number" id="m-linen" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Music &amp; Entertainment</label><div class="inp-prefix"><span>$</span><input type="number" id="m-music" placeholder="0.00" min="0" step="0.01"></div></div>
+      <div class="inp-group"><label>Other Variable</label><div class="inp-prefix"><span>$</span><input type="number" id="m-othervar" placeholder="0.00" min="0" step="0.01"></div></div>
+    </div>
+
+    <!-- Custom expenses -->
+    <div class="me-section-head">➕ Custom Expenses <span>— any other costs not listed above</span></div>
+    <div id="custom-exp-list"></div>
+    <button class="add-custom-btn" onclick="addCustomExpense()">＋ Add custom expense</button>
   </div>
 
   <div class="manual-card" id="manual-fixed-card">
@@ -648,7 +710,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 
   <div class="manual-card">
     <h3>🗓 Period Label</h3>
-    <div class="period-row" style="align-items:center">
+    <div class="period-row" style="align-items:flex-end">
       <div class="inp-group" style="flex:2;min-width:0">
         <label>Period label</label>
         <input type="text" id="i-label" placeholder="e.g. Jan 2024  ·  Q1 2024  ·  FY2024">
@@ -848,6 +910,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
       </svg>
     </div>
     <div class="tut-tip"><span class="tut-tip-icon">💡</span><span>In Toast: go to Reports → Export. In Square: go to Sales Summary → Export CSV. For other systems, look for "Export" or "Download" on any sales summary or P&amp;L report.</span></div>
+  </div>
+
+  <!-- Step 2.5 — Manual Expense Entry -->
+  <div class="tut-section">
+    <div class="tut-step-head"><span class="tut-step-num">2.5</span><h2>Don't Have Expense Reports? Enter Manually</h2></div>
+    <p>If you don't have a formatted expense CSV yet, click <strong>"Don't have expense reports? Enter manually →"</strong> inside the Expenses upload card. A form will appear below with pre-built input fields for the most common restaurant costs.</p>
+    <p>Expenses are split into two categories:</p>
+    <p><strong>📌 Fixed</strong> — costs that stay the same every month regardless of how busy you are: rent, insurance, POS software, accounting, licenses &amp; permits.</p>
+    <p><strong>📈 Variable</strong> — costs that fluctuate with your business volume: utilities, repairs, delivery &amp; packaging, credit card processing fees, cleaning supplies, uniforms, linen service, trash removal, music &amp; entertainment.</p>
+    <p>Use <strong>+ Add custom expense</strong> at the bottom for anything not listed — just enter a name and a monthly amount.</p>
+    <div class="tut-tip"><span class="tut-tip-icon">💡</span><span>Even rough estimates are better than $0 — entering approximate costs gives you a much more accurate break-even and profit number than leaving expenses blank. You can always re-upload a real CSV later to replace the manual entries.</span></div>
   </div>
 
   <!-- Step 3 -->
@@ -2741,6 +2814,90 @@ function getFixed(){
   return{rent:gv('i-rent'),insurance:gv('i-insurance'),pos_software:gv('i-pos'),marketing:gv('i-marketing'),accounting:gv('i-accounting'),licenses_permits:gv('i-licenses'),other_fixed:gv('i-other'),extra_payroll:parseFloat(document.getElementById('i-extrapay').value)||0};
 }
 
+// ── Manual expense section toggle ────────────────────────────────────────────
+function toggleManualExpenses() {
+  var section   = document.getElementById('manual-exp-section');
+  var btn       = document.getElementById('manual-exp-toggle');
+  var fixedCard = document.getElementById('manual-fixed-card');
+  var isOpen    = section.style.display === 'block';
+  if (isOpen) {
+    section.style.display   = 'none';
+    fixedCard.style.display = '';
+    btn.textContent = '📝 Don\'t have expense reports? Enter manually →';
+  } else {
+    section.style.display   = 'block';
+    fixedCard.style.display = 'none';
+    btn.textContent = '✕ Hide manual entry';
+  }
+}
+
+// ── Custom expense rows ──────────────────────────────────────────────────────
+var _customExpCount = 0;
+function addCustomExpense() {
+  var list = document.getElementById('custom-exp-list');
+  var id   = ++_customExpCount;
+  var row  = document.createElement('div');
+  row.className = 'custom-exp-row';
+  row.id = 'custom-exp-row-' + id;
+  row.innerHTML =
+    '<input type="text" placeholder="Expense name (e.g. Pest Control)" id="custom-exp-label-' + id + '">' +
+    '<div class="inp-prefix"><span>$</span><input type="number" placeholder="0.00" min="0" step="0.01" id="custom-exp-amt-' + id + '"></div>' +
+    '<button class="rm-custom-btn" onclick="removeCustomExpense(' + id + ')" title="Remove">✕</button>';
+  list.appendChild(row);
+}
+function removeCustomExpense(id) {
+  var row = document.getElementById('custom-exp-row-' + id);
+  if (row) row.remove();
+}
+
+// ── Collect manual expense rows for save payload ─────────────────────────────
+function getManualExpRows() {
+  var section = document.getElementById('manual-exp-section');
+  if (!section || section.style.display !== 'block') return { fixedInputs: {}, expenseRows: [] };
+  function gv(id) { var el = document.getElementById(id); return el ? (parseFloat(el.value) || 0) : 0; }
+
+  var fixedInputs = {
+    rent:             gv('m-rent'),
+    insurance:        gv('m-insurance'),
+    pos_software:     gv('m-pos'),
+    marketing:        gv('m-marketing'),
+    accounting:       gv('m-accounting'),
+    licenses_permits: gv('m-licenses'),
+    other_fixed:      gv('m-otherfixed') + gv('m-equiplease'),
+  };
+
+  var varMap = [
+    ['m-utilities', 'Utilities'],
+    ['m-repairs',   'Repairs & Maintenance'],
+    ['m-delivery',  'Delivery & Packaging'],
+    ['m-ccfees',    'Credit Card Processing Fees'],
+    ['m-cleaning',  'Cleaning Supplies'],
+    ['m-uniforms',  'Uniforms & Laundry'],
+    ['m-trash',     'Trash & Waste Removal'],
+    ['m-linen',     'Linen Service'],
+    ['m-music',     'Music & Entertainment'],
+    ['m-othervar',  'Other Variable'],
+  ];
+  var expenseRows = [];
+  varMap.forEach(function(pair) {
+    var amt = gv(pair[0]);
+    if (amt > 0) expenseRows.push({ category: pair[1], amount: amt, date: null });
+  });
+
+  var list = document.getElementById('custom-exp-list');
+  if (list) {
+    list.querySelectorAll('.custom-exp-row').forEach(function(row) {
+      var m = row.id.match(/custom-exp-row-(\d+)/);
+      if (!m) return;
+      var n   = m[1];
+      var lbl = (document.getElementById('custom-exp-label-' + n) || {}).value || '';
+      var amt = parseFloat((document.getElementById('custom-exp-amt-'   + n) || {}).value) || 0;
+      if (lbl.trim() && amt > 0) expenseRows.push({ category: lbl.trim(), amount: amt, date: null });
+    });
+  }
+  return { fixedInputs: fixedInputs, expenseRows: expenseRows };
+}
+
 // ── Coverage warning modal ─────────────────────────────────────────────────
 var _pendingSavePayload = null;
 
@@ -2819,6 +2976,11 @@ function savePeriod(){
   var payR = S.parsed.payroll.rows || [];
   var expR = S.parsed.expenses.rows || [];
 
+  // Merge manual expense entry if the section is open
+  var manualExp = getManualExpRows();
+  if (manualExp.expenseRows.length > 0) expR = expR.concat(manualExp.expenseRows);
+  var mergedFixed = Object.assign({}, manualExp.fixedInputs, getFixed());
+
   // Date range: prefer parser-supplied dateRange (survives conflict row replacement),
   // fall back to scanning all rows.
   var ds=null,de=null,pt='manual';
@@ -2844,7 +3006,7 @@ function savePeriod(){
   dispatchSave({label:label||ds||new Date().toISOString().slice(0,10),periodType:pt,
     dateStart:ds,dateEnd:de,posRows:posR,payrollRows:payR,expenseRows:expR,bankRows:bankR,
     monthsInPeriod:monthsInPeriod,
-    fixedInputs:getFixed(),revenueSplitOverride:revSplitOverride,paymentSplitData:paymentSplitData,
+    fixedInputs:mergedFixed,revenueSplitOverride:revSplitOverride,paymentSplitData:paymentSplitData,
     categoryOverrides:S.categoryOverrides});
 }
 
@@ -2875,6 +3037,17 @@ function clearForm(){
   if (lumpNotice) lumpNotice.style.display = 'none';
   document.getElementById('i-label').value = '';
   document.getElementById('period-hint').textContent = '';
+  // Reset manual expense section
+  var manualIds = ['m-rent','m-insurance','m-pos','m-marketing','m-accounting',
+    'm-licenses','m-equiplease','m-otherfixed','m-utilities','m-repairs',
+    'm-delivery','m-ccfees','m-cleaning','m-uniforms','m-trash','m-linen',
+    'm-music','m-othervar'];
+  manualIds.forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('custom-exp-list').innerHTML = '';
+  _customExpCount = 0;
 }
 
 function loadHistory(){
