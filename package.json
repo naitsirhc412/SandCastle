@@ -1,0 +1,23 @@
+{
+  "name": "sandcastle",
+  "version": "1.0.0",
+  "description": "Private local financial dashboard for business owners",
+  "main": "main.js",
+  "scripts": {
+    "start":       "npm run build && electron .",
+    "dev":         "electron . --dev",
+    "watch":       "node build.js --watch",
+    "build":       "node build.js",
+    "build:prod":  "node build.js --minify",
+    "build-mac":   "electron-builder --mac",
+    "build-win":   "electron-builder --win"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "electron":          "^29.1.0",
+    "electron-builder":  "^24.13.3",
+    "esbuild":           "^0.21.0"
+  }
+}
